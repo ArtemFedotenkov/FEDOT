@@ -1,5 +1,5 @@
 const SITE_CONFIG = {
-  youtubeChannelId: "UCAPMkkZzlYhVX4Rn5hRCW9g",
+  videosJsonUrl: "videos.json",
   maxVideos: 6,
   links: {
     youtube: "https://www.youtube.com/channel/UCAPMkkZzlYhVX4Rn5hRCW9g",
@@ -50,25 +50,12 @@ function renderPlatforms() {
 }
 
 async function loadVideos() {
-  const channelId = SITE_CONFIG.youtubeChannelId.trim();
-  const isConfigured = channelId && !channelId.includes("REPLACE");
-
-  if (!isConfigured) {
-    hideVideosSection();
-    return;
-  }
-
-  const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channelId)}`;
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(feedUrl)}`;
-
   try {
-    const response = await fetch(proxyUrl);
-    if (!response.ok) throw new Error("RSS request failed");
+    const response = await fetch(SITE_CONFIG.videosJsonUrl, { cache: "no-store" });
+    if (!response.ok) throw new Error("videos.json request failed");
 
-    const xmlText = await response.text();
-    const videos = parseYouTubeFeed(xmlText)
-      .filter((video) => !video.isShort)
-      .slice(0, SITE_CONFIG.maxVideos);
+    const data = await response.json();
+    const videos = Array.isArray(data?.videos) ? data.videos.slice(0, SITE_CONFIG.maxVideos) : [];
     if (!videos.length) throw new Error("RSS feed is empty");
 
     renderVideos(videos);
@@ -87,22 +74,6 @@ function hideVideosSection() {
   document.querySelector("#videos").hidden = true;
   document.querySelector("#videos-nav-link").hidden = true;
   document.querySelector("#video-grid").innerHTML = "";
-}
-
-function parseYouTubeFeed(xmlText) {
-  const doc = new DOMParser().parseFromString(xmlText, "application/xml");
-  return Array.from(doc.querySelectorAll("entry")).map((entry) => {
-    const videoId = entry.querySelector("videoId")?.textContent || "";
-    const title = entry.querySelector("title")?.textContent || "Видео на YouTube";
-    const url = entry.querySelector("link")?.getAttribute("href") || `https://www.youtube.com/watch?v=${videoId}`;
-    const published = entry.querySelector("published")?.textContent || "";
-    const isShort = url.includes("youtube.com/shorts/");
-    const thumbnail = videoId
-      ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
-      : "assets/hero-gaming.png";
-
-    return { title, url, published, thumbnail, isShort };
-  });
 }
 
 function renderVideos(videos) {
